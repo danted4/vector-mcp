@@ -4,7 +4,9 @@
       "command": "./mcp.sh",
       "args": [],
       "env": {
-        "NODE_ENV": "production"
+        "NODE_ENV": "production",
+        "DEFAULT_PROJECT_ID": "my-project",
+        "DEFAULT_DIRECTORY_PATH": "/absolute/path/to/my-project"
       }
     }
   }

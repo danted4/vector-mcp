@@ -23,6 +23,10 @@ import { FileIndexer } from './utils/indexer/xr.js';
 const mongoUri = process.env.MONGODB_URI || 'mongodb://root:examplepassword@localhost:27017';
 const mongoClient = new MongoClient(mongoUri);
 
+// Default project configuration from environment
+const DEFAULT_PROJECT_ID = process.env.DEFAULT_PROJECT_ID;
+const DEFAULT_DIRECTORY_PATH = process.env.DEFAULT_DIRECTORY_PATH;
+
 // Global service instances (initialized in initMCP())
 let vectorStore;
 let embeddingProvider;
@@ -104,7 +108,7 @@ class VectorMCPServer {
                 },
                 projectId: {
                   type: 'string',
-                  description: 'Project ID to search within (optional)'
+                  description: 'Project ID to search within (uses DEFAULT_PROJECT_ID env var if not provided)'
                 },
                 topK: {
                   type: 'number',
@@ -112,31 +116,7 @@ class VectorMCPServer {
                   default: 5
                 }
               },
-              required: ['query']
-            }
-          },
-          {
-            name: 'index_codebase',
-            description: 'Index a codebase directory for semantic search',
-            inputSchema: {
-              type: 'object',
-              properties: {
-                projectId: {
-                  type: 'string',
-                  description: 'Unique identifier for this project'
-                },
-                directoryPath: {
-                  type: 'string',
-                  description: 'Path to the directory to index'
-                },
-                excludePatterns: {
-                  type: 'array',
-                  items: { type: 'string' },
-                  description: 'Additional patterns to exclude (beyond defaults)',
-                  default: []
-                }
-              },
-              required: ['projectId', 'directoryPath']
+              required: []
             }
           },
           {
@@ -183,11 +163,11 @@ class VectorMCPServer {
               properties: {
                 projectId: {
                   type: 'string',
-                  description: 'Project ID to update'
+                  description: 'Project ID to update (uses DEFAULT_PROJECT_ID env var if not provided)'
                 },
                 directoryPath: {
                   type: 'string',
-                  description: 'Path to the directory to scan for changes'
+                  description: 'Path to the directory to scan for changes (uses DEFAULT_DIRECTORY_PATH env var if not provided)'
                 },
                 excludePatterns: {
                   type: 'array',
@@ -196,7 +176,7 @@ class VectorMCPServer {
                   default: []
                 }
               },
-              required: ['projectId', 'directoryPath']
+              required: []
             }
           }
         ]
@@ -281,8 +261,8 @@ class VectorMCPServer {
    * @param {number} [args.topK=5] - Number of results to return
    * @returns {Promise<Object>} Formatted search results
    */
-  async handleSearchCode(args) {
-    const { query, projectId, topK = 5 } = args;
+   async handleSearchCode(args) {
+    const { query, projectId = DEFAULT_PROJECT_ID, topK = 5 } = args;
     
     if (!query) {
       throw new Error('Query is required');
@@ -328,8 +308,20 @@ ${result.content}
    * @param {string[]} [args.excludePatterns] - Additional exclude patterns
    * @returns {Promise<Object>} Indexing results summary
    */
-  async handleIndexCodebase(args) {
-    const { projectId, directoryPath, excludePatterns = [] } = args;
+   async handleIndexCodebase(args) {
+    const { 
+      projectId = DEFAULT_PROJECT_ID, 
+      directoryPath = DEFAULT_DIRECTORY_PATH, 
+      excludePatterns = [] 
+    } = args;
+
+    if (!projectId) {
+      throw new Error('Project ID is required (provide as argument or set DEFAULT_PROJECT_ID environment variable)');
+    }
+
+    if (!directoryPath) {
+      throw new Error('Directory path is required (provide as argument or set DEFAULT_DIRECTORY_PATH environment variable)');
+    }
 
     console.error(`Indexing codebase: ${projectId} from ${directoryPath}`);
     
@@ -449,8 +441,20 @@ ${stats.files.map(file => `- ${file}`).join('\n')}`;
    * @param {string[]} [args.excludePatterns] - Additional exclude patterns
    * @returns {Promise<Object>} Update results with delta statistics
    */
-  async handleUpdateProject(args) {
-    const { projectId, directoryPath, excludePatterns = [] } = args;
+   async handleUpdateProject(args) {
+    const { 
+      projectId = DEFAULT_PROJECT_ID, 
+      directoryPath = DEFAULT_DIRECTORY_PATH, 
+      excludePatterns = [] 
+    } = args;
+
+    if (!projectId) {
+      throw new Error('Project ID is required (provide as argument or set DEFAULT_PROJECT_ID environment variable)');
+    }
+
+    if (!directoryPath) {
+      throw new Error('Directory path is required (provide as argument or set DEFAULT_DIRECTORY_PATH environment variable)');
+    }
 
     console.error(`Updating project: ${projectId} from ${directoryPath} (delta only)`);
     
