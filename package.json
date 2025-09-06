@@ -5,7 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
-    "setup": "./setup.sh",
+    "binaries-start": "./utils/sh/start.sh",
+    "binaries-stop": "./utils/sh/stop.sh",
     "mcp": "node mcp-server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
