@@ -2,6 +2,52 @@
 
 A Model Context Protocol (MCP) server for Claude Code that provides semantic search across codebases using MongoDB and Ollama embeddings.
 
+## Architecture
+
+```
+┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
+│   Claude Code   │    │   Web Browser   │    │   File System  │
+│                 │    │                 │    │                 │
+│  - Context AI   │    │  - Project Mgmt │    │  - Source Code  │
+│  - Code Search  │    │  - Live Logs    │    │  - Delta Check  │
+└─────────┬───────┘    └─────────┬───────┘    └─────────┬───────┘
+          │                      │                      │
+          │ stdio/MCP            │ HTTP API             │ fs.watch
+          │                      │                      │
+          ▼                      ▼                      ▼
+┌──────────────────────────────────────────────────────────────┐
+│                    Vector MCP Server                         │
+│                                                              │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
+│  │ MCP Handler │  │ Web Server  │  │ Job Manager │          │
+│  │             │  │             │  │             │          │
+│  │ - Tools     │  │ - REST API  │  │ - Async Ops │          │
+│  │ - Resources │  │ - Static UI │  │ - Progress  │          │
+│  └─────┬───────┘  └─────┬───────┘  └─────┬───────┘          │
+│        │                │                │                  │
+│        └────────────────┼────────────────┘                  │
+│                         │                                   │
+│  ┌─────────────────────────────────────────────────────────┐ │
+│  │              File Indexer                               │ │
+│  │                                                         │ │
+│  │  - Code Chunking    - File Hashing    - Delta Logic    │ │
+│  │  - Content Filter   - Pattern Match   - Change Track   │ │
+│  └─────────────────────┬───────────────────────────────────┘ │
+│                        │                                     │
+└────────────────────────┼─────────────────────────────────────┘
+                         │
+         ┌───────────────┼───────────────┐
+         │               │               │
+         ▼               ▼               ▼
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐
+│   Ollama    │  │  MongoDB    │  │   Logger    │
+│             │  │             │  │             │
+│ - llama2    │  │ - Vectors   │  │ - Live Feed │
+│ - Embedding │  │ - Metadata  │  │ - Job Logs  │
+│ - Local AI  │  │ - Projects  │  │ - File Log  │
+└─────────────┘  └─────────────┘  └─────────────┘
+```
+
 ## Features
 
 - 🔍 **Semantic Code Search** - Search your codebase using natural language queries
@@ -11,29 +57,30 @@ A Model Context Protocol (MCP) server for Claude Code that provides semantic sea
 - 🔧 **MCP Integration** - Works seamlessly with Claude Code/OpenCode
 - 🐳 **Docker Ready** - Simple setup with Docker Compose for mongodb (vector store)
 - 🦙 **Ollama Support** - Local embeddings using Ollama with llama2 model
+- ⚡ **Async Job System** - Background processing with real-time progress tracking
 
 ## Quick Start
 
-### 🐳 Docker Setup (Recommended)
+### Prerequisites
+- 🔧 **Docker** - https://www.docker.com/ (for MongoDB)
+- 🦙 **Ollama** - https://ollama.com/download (for embeddings)
+- 🧵 **Yarn** - Package manager
 
-### Prerequisites (host machine requirements)
-#### 1. 🔧 Docker Setup - https://www.docker.com/ (Optional if - you want to run mongo on host in which case having mongo on host becomes the prerequisite)
-#### 2. 🔧 Ollama - https://ollama.com/download (Optional if - you want to use paid openAI or API keys for indexing, for free we will use llama2 for indexing)
+### Installation
 
-
-1. **Clone**
-
+1. **Clone the repository:**
    ```bash
-   # Clone and enter the project directory
    git clone <repository-url>
    cd vector-mcp
-
-2. **Start MongoDB with Docker:**
-   ```bash
-   ./setup.sh
    ```
 
-3. **Install and start Ollama:**
+2. **Start MongoDB:**
+   ```bash
+   yarn run setup
+   # or manually: docker-compose up -d
+   ```
+
+3. **Install and configure Ollama:**
    ```bash
    # Install Ollama (macOS)
    brew install ollama
@@ -47,18 +94,18 @@ A Model Context Protocol (MCP) server for Claude Code that provides semantic sea
 
 4. **Install dependencies:**
    ```bash
-   npm install
+   yarn install
    ```
 
 5. **Start the web UI server:**
    ```bash
-   npm start
+   yarn start
    ```
    Visit http://localhost:3000 to access the web interface.
 
 6. **For Claude Code integration, start the MCP server:**
    ```bash
-   npm run mcp
+   yarn run mcp
    ```
 
 ## Usage
@@ -247,26 +294,38 @@ Projects now store metadata in `project_metadata` collection:
 
 ## Configuration
 
-### Docker Environment Variables
-
-The Docker setup uses the following environment variables (configured in `docker-compose.yml`):
+### Environment Variables
 
 ```env
-MONGODB_URI=mongodb://root:examplepassword@mongodb:27017
-OLLAMA_HOST=http://ollama:11434
+MONGODB_URI=mongodb://root:examplepassword@localhost:27017
+OLLAMA_HOST=http://localhost:11434
 OLLAMA_MODEL=llama2
 PORT=3000
-NODE_ENV=production
 ```
 
 ## Project Structure
 
-- `index.js` - Web server with UI and API endpoints
-- `mcp-server.js` - MCP protocol server for Claude integration
-- `MongoVectorStore.js` - MongoDB vector storage implementation
-- `OllamaEmbedding.js` - Ollama embedding provider
-- `FileIndexer.js` - Code indexing and chunking logic
-- `public/index.html` - Web interface
+```
+vector-mcp/
+├── index.js                    # Express web server + REST API
+├── mcp-server.js              # MCP protocol server for Claude
+├── utils/
+│   ├── vector-store/
+│   │   ├── mongovs.js         # MongoDB vector storage
+│   │   └── embeddings.js      # Ollama embedding provider
+│   ├── indexer/
+│   │   └── xr.js             # File indexing and chunking
+│   ├── jobs/
+│   │   └── manager.js        # Async job management
+│   ├── logger/
+│   │   └── logger.js         # Structured logging with emojis
+│   └── sh/
+│       └── setup.sh          # Environment setup script
+├── public/
+│   └── index.html            # Web UI interface
+├── dist/                     # MCP server distribution
+└── docker-compose.yml       # MongoDB container setup
+```
 
 ## Docker Commands
 
