@@ -2,7 +2,7 @@ import fs from 'fs-extra';
 import path from 'path';
 import { glob } from 'glob';
 import crypto from 'crypto';
-import { logger } from '../../Logger.js';
+import { logger } from '../logger/logger.js';
 
 export class FileIndexer {
   constructor(embeddingProvider, vectorStore, jobManager = null) {

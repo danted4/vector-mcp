@@ -3,11 +3,11 @@ import bodyParser from 'body-parser';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { MongoClient } from 'mongodb';
-import { OllamaEmbedding } from './OllamaEmbedding.js';
-import { MongoVectorStore } from './MongoVectorStore.js';
-import { FileIndexer } from './FileIndexer.js';
-import { JobManager } from './JobManager.js';
-import { logger } from './Logger.js';
+import { OllamaEmbedding } from './utils/vector-store/embeddings.js';
+import { MongoVectorStore } from './utils/vector-store/mongovs.js';
+import { FileIndexer } from './utils/indexer/xr.js';
+import { JobManager } from './utils/jobs/manager.js';
+import { logger } from './utils/logger/logger.js';
 import fs from 'fs';
 
 const __filename = fileURLToPath(import.meta.url);

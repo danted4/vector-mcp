@@ -1,4 +1,4 @@
-import { logger } from './Logger.js';
+import { logger } from '../logger/logger.js';
 
 export class JobManager {
   constructor() {

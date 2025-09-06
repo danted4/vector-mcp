@@ -9,9 +9,9 @@ import {
   ReadResourceRequestSchema
 } from '@modelcontextprotocol/sdk/types.js';
 import { MongoClient } from 'mongodb';
-import { OllamaEmbedding } from './OllamaEmbedding.js';
-import { MongoVectorStore } from './MongoVectorStore.js';
-import { FileIndexer } from './FileIndexer.js';
+import { OllamaEmbedding } from './utils/vector-store/embeddings.js';
+import { MongoVectorStore } from './utils/vector-store/mongovs.js';
+import { FileIndexer } from './utils/indexer/xr.js';
 
 const mongoUri = process.env.MONGODB_URI || 'mongodb://root:examplepassword@localhost:27017';
 const mongoClient = new MongoClient(mongoUri);
