@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "vector-mcp": {
+      "command": "node",
+      "args": ["/Users/danted4/Desktop/pc/repos/vector-mcp/mcp-server.js"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}

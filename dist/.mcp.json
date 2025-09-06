@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "vector-mcp": {
+      "command": "./mcp.sh",
+      "args": [],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
