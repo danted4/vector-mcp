@@ -1,5 +1,11 @@
 #!/usr/bin/env node
 
+// ==========================================
+// Vector MCP Server - Model Context Protocol Interface
+// ==========================================
+// This server provides MCP tools for semantic code search and project management
+// for use with Claude Code and other MCP-compatible clients.
+
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { 
@@ -13,24 +19,33 @@ import { OllamaEmbedding } from './utils/vector-store/embeddings.js';
 import { MongoVectorStore } from './utils/vector-store/mongovs.js';
 import { FileIndexer } from './utils/indexer/xr.js';
 
+// Database configuration
 const mongoUri = process.env.MONGODB_URI || 'mongodb://root:examplepassword@localhost:27017';
 const mongoClient = new MongoClient(mongoUri);
 
+// Global service instances (initialized in initMCP())
 let vectorStore;
 let embeddingProvider;
 let fileIndexer;
 
+/**
+ * Initializes the MCP server with database connections and service instances
+ * Sets up MongoDB indexes and creates service objects for vector operations
+ * @returns {Promise<void>}
+ * @throws {Error} If initialization fails
+ */
 async function initMCP() {
   try {
     await mongoClient.connect();
     const db = mongoClient.db('code_context');
     const collection = db.collection('documents');
 
-    // Create indexes
-    await collection.createIndex({ embedding: 1 });
-    await collection.createIndex({ projectId: 1 });
-    await collection.createIndex({ filePath: 1 });
+    // Create performance indexes for vector operations
+    await collection.createIndex({ embedding: 1 }); // Vector similarity searches
+    await collection.createIndex({ projectId: 1 }); // Project-scoped queries
+    await collection.createIndex({ filePath: 1 }); // File-based lookups
 
+    // Initialize service instances
     vectorStore = new MongoVectorStore(collection, db);
     embeddingProvider = new OllamaEmbedding(process.env.OLLAMA_MODEL || 'llama2');
     fileIndexer = new FileIndexer(embeddingProvider, vectorStore);
@@ -42,7 +57,15 @@ async function initMCP() {
   }
 }
 
+/**
+ * Main MCP server class that handles tool registration and request routing
+ * Provides semantic code search and project management capabilities via MCP protocol
+ */
 class VectorMCPServer {
+  /**
+   * Creates a new VectorMCPServer instance
+   * Initializes the MCP server and sets up request handlers
+   */
   constructor() {
     this.server = new Server(
       {
@@ -60,7 +83,12 @@ class VectorMCPServer {
     this.setupHandlers();
   }
 
+  /**
+   * Sets up all MCP request handlers for tools, resources, and tool execution
+   * Defines the available tools and their schemas for client discovery
+   */
   setupHandlers() {
+    // Tool discovery handler - returns available tools and their schemas
     this.server.setRequestHandler(ListToolsRequestSchema, async () => {
       return {
         tools: [
@@ -175,6 +203,7 @@ class VectorMCPServer {
       };
     });
 
+    // Tool execution handler - routes tool calls to appropriate methods
     this.server.setRequestHandler(CallToolRequestSchema, async (request) => {
       const { name, arguments: args } = request.params;
 
@@ -207,6 +236,7 @@ class VectorMCPServer {
       }
     });
 
+    // Resource discovery handler - lists available project resources
     this.server.setRequestHandler(ListResourcesRequestSchema, async () => {
       const projects = await vectorStore.getProjects();
       return {
@@ -219,6 +249,7 @@ class VectorMCPServer {
       };
     });
 
+    // Resource reading handler - provides project data when requested
     this.server.setRequestHandler(ReadResourceRequestSchema, async (request) => {
       const url = new URL(request.params.uri);
       
@@ -241,6 +272,15 @@ class VectorMCPServer {
     });
   }
 
+  /**
+   * Handles semantic code search requests
+   * Generates embeddings for the query and performs vector similarity search
+   * @param {Object} args - Search arguments
+   * @param {string} args.query - Natural language search query
+   * @param {string} [args.projectId] - Optional project filter
+   * @param {number} [args.topK=5] - Number of results to return
+   * @returns {Promise<Object>} Formatted search results
+   */
   async handleSearchCode(args) {
     const { query, projectId, topK = 5 } = args;
     
@@ -250,9 +290,13 @@ class VectorMCPServer {
 
     console.error(`Searching for: "${query}" in project: ${projectId || 'all'}`);
     
+    // Generate embedding vector for the search query
     const queryEmbedding = await embeddingProvider.getEmbedding(query);
+    
+    // Perform vector similarity search
     const results = await vectorStore.search(queryEmbedding, topK, projectId);
 
+    // Format results with markdown for better readability
     const formatted = results.map((result, index) => {
       return `**Result ${index + 1}** (Score: ${result.score.toFixed(4)})
 **File:** ${result.filePath}
@@ -275,11 +319,21 @@ ${result.content}
     };
   }
 
+  /**
+   * Handles codebase indexing requests
+   * Processes files in the specified directory and creates vector embeddings
+   * @param {Object} args - Indexing arguments
+   * @param {string} args.projectId - Unique project identifier
+   * @param {string} args.directoryPath - Directory to index
+   * @param {string[]} [args.excludePatterns] - Additional exclude patterns
+   * @returns {Promise<Object>} Indexing results summary
+   */
   async handleIndexCodebase(args) {
     const { projectId, directoryPath, excludePatterns = [] } = args;
 
     console.error(`Indexing codebase: ${projectId} from ${directoryPath}`);
     
+    // Perform full directory indexing
     const result = await fileIndexer.indexDirectory(directoryPath, projectId, excludePatterns);
     
     return {
@@ -297,6 +351,12 @@ The codebase is now searchable using the search_code tool.`
     };
   }
 
+  /**
+   * Handles project listing requests
+   * Returns all indexed projects with basic statistics
+   * @param {Object} args - Empty arguments object
+   * @returns {Promise<Object>} Formatted project list
+   */
   async handleListProjects(args) {
     const projects = await vectorStore.getProjects();
     
@@ -311,6 +371,7 @@ The codebase is now searchable using the search_code tool.`
       };
     }
 
+    // Format project list with statistics
     const formatted = projects.map(project => {
       return `**${project.projectId}**
 - Documents: ${project.documentCount}
@@ -327,6 +388,13 @@ The codebase is now searchable using the search_code tool.`
     };
   }
 
+  /**
+   * Handles project deletion requests
+   * Removes all documents and metadata for the specified project
+   * @param {Object} args - Deletion arguments
+   * @param {string} args.projectId - Project ID to delete
+   * @returns {Promise<Object>} Deletion confirmation
+   */
   async handleDeleteProject(args) {
     const { projectId } = args;
     
@@ -342,6 +410,13 @@ The codebase is now searchable using the search_code tool.`
     };
   }
 
+  /**
+   * Handles project statistics requests
+   * Returns detailed information about a project's indexed content
+   * @param {Object} args - Statistics arguments
+   * @param {string} args.projectId - Project ID to get stats for
+   * @returns {Promise<Object>} Formatted project statistics
+   */
   async handleGetProjectStats(args) {
     const { projectId } = args;
     
@@ -365,16 +440,28 @@ ${stats.files.map(file => `- ${file}`).join('\n')}`;
     };
   }
 
+  /**
+   * Handles project update requests with delta indexing
+   * Only processes files that have changed since the last indexing
+   * @param {Object} args - Update arguments
+   * @param {string} args.projectId - Project ID to update
+   * @param {string} args.directoryPath - Directory to scan for changes
+   * @param {string[]} [args.excludePatterns] - Additional exclude patterns
+   * @returns {Promise<Object>} Update results with delta statistics
+   */
   async handleUpdateProject(args) {
     const { projectId, directoryPath, excludePatterns = [] } = args;
 
     console.error(`Updating project: ${projectId} from ${directoryPath} (delta only)`);
     
+    // Perform delta-only indexing (only changed files)
     const result = await fileIndexer.indexDirectory(directoryPath, projectId, excludePatterns, true);
     
+    // Format delta statistics if available
     let statsText = '';
     if (result.deltaStats) {
       statsText = `
+
 📈 **Delta Statistics:**
 - Files skipped (unchanged): ${result.deltaStats.skipped}
 - Files updated: ${result.deltaStats.updated}
@@ -398,6 +485,11 @@ The project index has been updated with only the changed files.`
     };
   }
 
+  /**
+   * Starts the MCP server with stdio transport
+   * Establishes connection for MCP client communication
+   * @returns {Promise<void>}
+   */
   async run() {
     const transport = new StdioServerTransport();
     await this.server.connect(transport);
@@ -405,11 +497,16 @@ The project index has been updated with only the changed files.`
   }
 }
 
-// Initialize and run
+/**
+ * Main application entry point
+ * Initializes services and starts the MCP server
+ * @returns {Promise<void>}
+ */
 async function main() {
   await initMCP();
   const server = new VectorMCPServer();
   await server.run();
 }
 
+// Start the server
 main().catch(console.error);

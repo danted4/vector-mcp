@@ -1,3 +1,7 @@
+// ==========================================
+// Vector MCP Server - Main Application
+// ==========================================
+
 import express from 'express';
 import bodyParser from 'body-parser';
 import path from 'path';
@@ -10,34 +14,47 @@ import { JobManager } from './utils/jobs/manager.js';
 import { logger } from './utils/logger/logger.js';
 import fs from 'fs';
 
+// ES6 module compatibility setup
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+// Express app configuration
 const app = express();
-app.use(bodyParser.json({ limit: '50mb' }));
+app.use(bodyParser.json({ limit: '50mb' })); // Large limit for base64 file uploads
 app.use(express.static(path.join(__dirname, 'public')));
 
+// Database and service configuration
 const mongoUri = process.env.MONGODB_URI || 'mongodb://root:examplepassword@localhost:27017';
 const mongoClient = new MongoClient(mongoUri);
 
+// Global service instances (initialized in init())
 let vectorStore;
 let embeddingProvider;
 let fileIndexer;
 let jobManager;
 
+/**
+ * Initializes all services and database connections
+ * Sets up MongoDB indexes and tests external service connections
+ * @returns {Promise<void>}
+ * @throws {Error} If initialization fails
+ */
 async function init() {
   try {
     logger.info('Starting Vector MCP server initialization');
+    
+    // Connect to MongoDB and setup database
     logger.info('Connecting to MongoDB...');
     await mongoClient.connect();
     const db = mongoClient.db('code_context');
     const collection = db.collection('documents');
 
-    // Create indexes
-    await collection.createIndex({ embedding: 1 });
-    await collection.createIndex({ projectId: 1 });
-    await collection.createIndex({ filePath: 1 });
+    // Create performance indexes for vector operations
+    await collection.createIndex({ embedding: 1 }); // For similarity searches
+    await collection.createIndex({ projectId: 1 }); // For project filtering
+    await collection.createIndex({ filePath: 1 }); // For file lookups
 
+    // Initialize service instances
     vectorStore = new MongoVectorStore(collection, db);
     embeddingProvider = new OllamaEmbedding(process.env.OLLAMA_MODEL || 'llama2');
     jobManager = new JobManager();
@@ -45,7 +62,7 @@ async function init() {
     
     logger.success('MongoDB connected and indexes created');
     
-    // Test Ollama connection
+    // Test Ollama embedding service availability
     try {
       logger.info('Testing Ollama connection...');
       await embeddingProvider.getEmbedding('test');
@@ -61,12 +78,31 @@ async function init() {
   }
 }
 
-// Serve the web UI
+// ==========================================
+// Web UI Routes
+// ==========================================
+
+/**
+ * Serves the main web UI interface
+ * @route GET /
+ */
 app.get('/', (req, res) => {
   res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
-// MCP endpoint to serve context queries
+// ==========================================
+// MCP Protocol Routes
+// ==========================================
+
+/**
+ * MCP endpoint for semantic code search queries
+ * Handles embedding generation and vector similarity search
+ * @route POST /mcp/context
+ * @param {Object} req.body - Request body
+ * @param {string} req.body.query - Search query text
+ * @param {number} [req.body.topK=3] - Number of results to return
+ * @param {string} [req.body.projectId] - Optional project filter
+ */
 app.post('/mcp/context', async (req, res) => {
   const { query, topK, projectId } = req.body;
 
@@ -77,10 +113,10 @@ app.post('/mcp/context', async (req, res) => {
   try {
     console.log(`Context query: "${query}" (project: ${projectId || 'all'}, limit: ${topK || 3})`);
     
-    // Get query embedding
+    // Generate embedding vector for the search query
     const queryEmbedding = await embeddingProvider.getEmbedding(query);
 
-    // Search for top relevant docs
+    // Search for most similar code chunks
     const results = await vectorStore.search(queryEmbedding, topK || 3, projectId);
 
     res.json({ results });
@@ -90,7 +126,19 @@ app.post('/mcp/context', async (req, res) => {
   }
 });
 
-// API to create new project index (async with job)
+// ==========================================
+// Project Management API Routes
+// ==========================================
+
+/**
+ * Creates a new project index asynchronously
+ * Starts a background job and returns immediately with job ID
+ * @route POST /api/projects
+ * @param {Object} req.body - Request body
+ * @param {string} req.body.projectId - Unique project identifier
+ * @param {string} req.body.directoryPath - Directory to index
+ * @param {string[]} [req.body.excludePatterns] - Patterns to exclude from indexing
+ */
 app.post('/api/projects', async (req, res) => {
   const { projectId, directoryPath, excludePatterns = [] } = req.body;
 
@@ -99,15 +147,16 @@ app.post('/api/projects', async (req, res) => {
   }
 
   try {
+    // Create async job for indexing
     const job = jobManager.createJob('index', projectId, { directoryPath, excludePatterns });
     
-    // Start the job asynchronously
+    // Start the indexing job in background
     jobManager.runIndexJob(job.id, fileIndexer, directoryPath, projectId, excludePatterns, false)
       .catch(error => {
         logger.error(`Job ${job.id} failed: ${error.message}`, { jobId: job.id, projectId });
       });
 
-    // Return immediately with job ID
+    // Return immediately with job tracking information
     res.json({ 
       jobId: job.id,
       status: 'started',
@@ -119,7 +168,15 @@ app.post('/api/projects', async (req, res) => {
   }
 });
 
-// API to update existing project index (delta only, async with job)
+/**
+ * Updates an existing project with delta indexing
+ * Only processes files that have changed since last indexing
+ * @route POST /api/projects/:projectId/update
+ * @param {string} req.params.projectId - Project ID to update
+ * @param {Object} req.body - Request body
+ * @param {string} req.body.directoryPath - Directory to scan for changes
+ * @param {string[]} [req.body.excludePatterns] - Patterns to exclude
+ */
 app.post('/api/projects/:projectId/update', async (req, res) => {
   const { projectId } = req.params;
   const { directoryPath, excludePatterns = [] } = req.body;
@@ -129,15 +186,16 @@ app.post('/api/projects/:projectId/update', async (req, res) => {
   }
 
   try {
+    // Create delta update job
     const job = jobManager.createJob('update', projectId, { directoryPath, excludePatterns });
     
-    // Start the job asynchronously
+    // Start delta indexing job (deltaOnly = true)
     jobManager.runIndexJob(job.id, fileIndexer, directoryPath, projectId, excludePatterns, true)
       .catch(error => {
         logger.error(`Job ${job.id} failed: ${error.message}`, { jobId: job.id, projectId });
       });
 
-    // Return immediately with job ID
+    // Return job tracking information
     res.json({ 
       jobId: job.id,
       status: 'started',
@@ -149,16 +207,20 @@ app.post('/api/projects/:projectId/update', async (req, res) => {
   }
 });
 
-// API to test indexing current directory (async)
+/**
+ * Creates a test index of the current server directory
+ * Useful for testing the indexing system without external paths
+ * @route POST /api/test-current-dir
+ */
 app.post('/api/test-current-dir', async (req, res) => {
   try {
     const testProjectId = 'test-' + Date.now();
     const job = jobManager.createJob('index', testProjectId, { 
       directoryPath: process.cwd(),
-      excludePatterns: ['public/**']
+      excludePatterns: ['public/**'] // Exclude public assets
     });
     
-    // Start the job asynchronously
+    // Start test indexing job
     jobManager.runIndexJob(job.id, fileIndexer, process.cwd(), testProjectId, ['public/**'], false)
       .catch(error => {
         logger.error(`Job ${job.id} failed: ${error.message}`, { jobId: job.id, projectId: testProjectId });
@@ -176,7 +238,83 @@ app.post('/api/test-current-dir', async (req, res) => {
   }
 });
 
-// API to get job status
+/**
+ * Retrieves all available projects from the database
+ * @route GET /api/projects
+ */
+app.get('/api/projects', async (req, res) => {
+  try {
+    const projects = await vectorStore.getProjects();
+    res.json(projects);
+  } catch (error) {
+    console.error('Error fetching projects:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Deletes a project and all its associated documents
+ * @route DELETE /api/projects/:projectId
+ * @param {string} req.params.projectId - Project ID to delete
+ */
+app.delete('/api/projects/:projectId', async (req, res) => {
+  const { projectId } = req.params;
+  
+  try {
+    const deletedCount = await vectorStore.deleteProject(projectId);
+    res.json({ deletedCount });
+  } catch (error) {
+    console.error('Error deleting project:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Gets detailed statistics for a specific project
+ * @route GET /api/projects/:projectId/stats
+ * @param {string} req.params.projectId - Project ID to get stats for
+ */
+app.get('/api/projects/:projectId/stats', async (req, res) => {
+  const { projectId } = req.params;
+  
+  try {
+    const stats = await vectorStore.getProjectStats(projectId);
+    res.json(stats);
+  } catch (error) {
+    console.error('Error fetching project stats:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+/**
+ * Gets stored metadata for a project (directory path, exclude patterns, etc.)
+ * @route GET /api/projects/:projectId/metadata
+ * @param {string} req.params.projectId - Project ID to get metadata for
+ */
+app.get('/api/projects/:projectId/metadata', async (req, res) => {
+  const { projectId } = req.params;
+  
+  try {
+    const metadata = await vectorStore.getProjectMetadata(projectId);
+    if (!metadata) {
+      return res.status(404).json({ error: 'Project metadata not found' });
+    }
+    res.json(metadata);
+  } catch (error) {
+    console.error('Error fetching project metadata:', error);
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// ==========================================
+// Job Management API Routes
+// ==========================================
+
+/**
+ * Gets the status and progress of a specific job
+ * @route GET /api/jobs/:jobId
+ * @param {string} req.params.jobId - Job ID to query
+ */
 app.get('/api/jobs/:jobId', async (req, res) => {
   const { jobId } = req.params;
   
@@ -193,7 +331,10 @@ app.get('/api/jobs/:jobId', async (req, res) => {
   }
 });
 
-// API to list all jobs
+/**
+ * Lists all jobs (completed, running, and pending)
+ * @route GET /api/jobs
+ */
 app.get('/api/jobs', async (req, res) => {
   try {
     const jobs = jobManager.getAllJobs();
@@ -204,7 +345,10 @@ app.get('/api/jobs', async (req, res) => {
   }
 });
 
-// API to get active jobs
+/**
+ * Lists only currently active jobs (running or pending)
+ * @route GET /api/jobs/active
+ */
 app.get('/api/jobs/active', async (req, res) => {
   try {
     const activeJobs = jobManager.getActiveJobs();
@@ -215,7 +359,14 @@ app.get('/api/jobs/active', async (req, res) => {
   }
 });
 
-// API to clear server logs
+// ==========================================
+// Logging API Routes
+// ==========================================
+
+/**
+ * Clears the server log file
+ * @route POST /api/logs/clear
+ */
 app.post('/api/logs/clear', async (req, res) => {
   try {
     const success = logger.clear();
@@ -231,61 +382,13 @@ app.post('/api/logs/clear', async (req, res) => {
   }
 });
 
-// API to list all projects
-app.get('/api/projects', async (req, res) => {
-  try {
-    const projects = await vectorStore.getProjects();
-    res.json(projects);
-  } catch (error) {
-    console.error('Error fetching projects:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// API to delete a project
-app.delete('/api/projects/:projectId', async (req, res) => {
-  const { projectId } = req.params;
-  
-  try {
-    const deletedCount = await vectorStore.deleteProject(projectId);
-    res.json({ deletedCount });
-  } catch (error) {
-    console.error('Error deleting project:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// API to get project statistics
-app.get('/api/projects/:projectId/stats', async (req, res) => {
-  const { projectId } = req.params;
-  
-  try {
-    const stats = await vectorStore.getProjectStats(projectId);
-    res.json(stats);
-  } catch (error) {
-    console.error('Error fetching project stats:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// API to get project metadata
-app.get('/api/projects/:projectId/metadata', async (req, res) => {
-  const { projectId } = req.params;
-  
-  try {
-    const metadata = await vectorStore.getProjectMetadata(projectId);
-    if (!metadata) {
-      return res.status(404).json({ error: 'Project metadata not found' });
-    }
-    res.json(metadata);
-  } catch (error) {
-    console.error('Error fetching project metadata:', error);
-    res.status(500).json({ error: error.message });
-  }
-});
-
-// Server-Sent Events endpoint for real-time log streaming from server.log
+/**
+ * Server-Sent Events endpoint for real-time log streaming
+ * Watches the server log file and streams new entries to connected clients
+ * @route GET /api/logs/stream
+ */
 app.get('/api/logs/stream', async (req, res) => {
+  // Setup SSE headers
   res.writeHead(200, {
     'Content-Type': 'text/event-stream',
     'Cache-Control': 'no-cache',
@@ -294,7 +397,7 @@ app.get('/api/logs/stream', async (req, res) => {
     'Access-Control-Allow-Headers': 'Cache-Control'
   });
 
-  // Send recent logs first (last 50 lines)
+  // Send recent logs as historical context (last 50 lines)
   try {
     const recentLogs = await logger.getRecentLogs(50);
     recentLogs.forEach(logLine => {
@@ -315,11 +418,12 @@ app.get('/api/logs/stream', async (req, res) => {
     timestamp: new Date().toISOString()
   })}\n\n`);
 
-  // Watch server.log file for changes
+  // Setup file watching for real-time streaming
   const logFile = logger.logFile;
   let lastPosition = 0;
   let fileCleared = false;
   
+  // Get initial file position
   try {
     const stats = await fs.promises.stat(logFile);
     lastPosition = stats.size;
@@ -328,13 +432,13 @@ app.get('/api/logs/stream', async (req, res) => {
     lastPosition = 0;
   }
 
-  // Use fs.watchFile for cross-platform compatibility
+  // Use polling-based file watching for cross-platform compatibility
   const watchInterval = 1000; // Check every second
   const watcher = setInterval(async () => {
     try {
       const stats = await fs.promises.stat(logFile);
       
-      // Check if file was cleared (size became smaller)
+      // Detect if file was cleared (size became smaller)
       if (stats.size < lastPosition) {
         fileCleared = true;
         lastPosition = 0;
@@ -345,6 +449,7 @@ app.get('/api/logs/stream', async (req, res) => {
         })}\n\n`);
       }
       
+      // Check for new content
       if (stats.size > lastPosition) {
         // File has grown, read new content
         const stream = fs.createReadStream(logFile, { 
@@ -381,7 +486,7 @@ app.get('/api/logs/stream', async (req, res) => {
         });
       }
     } catch (error) {
-      // File might not exist or be accessible
+      // Handle file access errors
       if (error.code === 'ENOENT') {
         // File was deleted, reset position and wait for recreation
         if (lastPosition > 0) {
@@ -408,13 +513,21 @@ app.get('/api/logs/stream', async (req, res) => {
   });
 });
 
-// Health check endpoint
+// ==========================================
+// Health Check Route
+// ==========================================
+
+/**
+ * Health check endpoint for monitoring service status
+ * Tests connectivity to MongoDB and Ollama services
+ * @route GET /health
+ */
 app.get('/health', async (req, res) => {
   try {
-    // Check MongoDB connection
+    // Test MongoDB connection
     await mongoClient.db('admin').command({ ping: 1 });
     
-    // Check Ollama connection
+    // Test Ollama embedding service
     await embeddingProvider.getEmbedding('health check');
     
     res.json({ 
@@ -432,15 +545,26 @@ app.get('/health', async (req, res) => {
   }
 });
 
+// ==========================================
+// Server Configuration and Startup
+// ==========================================
+
 const PORT = process.env.PORT || 3000;
 
-// Graceful shutdown
+/**
+ * Handles graceful shutdown on SIGINT (Ctrl+C)
+ * Closes database connections before exiting
+ */
 process.on('SIGINT', async () => {
   console.log('Shutting down gracefully...');
   await mongoClient.close();
   process.exit(0);
 });
 
+/**
+ * Application startup sequence
+ * Initializes services and starts the Express server
+ */
 init().then(() => {
   app.listen(PORT, () => {
     logger.success(`Vector MCP server running on http://localhost:${PORT}`);
@@ -449,7 +573,7 @@ init().then(() => {
     logger.info(`Health check at http://localhost:${PORT}/health`);
     logger.info('Real-time log streaming available at /api/logs/stream');
     
-    // Cleanup old jobs every hour
+    // Schedule cleanup of old completed jobs every hour
     setInterval(() => {
       jobManager.cleanupOldJobs();
     }, 60 * 60 * 1000);

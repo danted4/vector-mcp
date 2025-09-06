@@ -2,7 +2,7 @@
 
 A Model Context Protocol (MCP) server for Claude Code that provides semantic search across codebases using MongoDB and Ollama embeddings.
 
-## Architecture
+## 🏗️ Architecture
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
@@ -48,7 +48,7 @@ A Model Context Protocol (MCP) server for Claude Code that provides semantic sea
 └─────────────┘  └─────────────┘  └─────────────┘
 ```
 
-## Features
+## ✨ Features
 
 - 🔍 **Semantic Code Search** - Search your codebase using natural language queries
 - 📁 **Project Management** - Index multiple projects with isolated namespaces
@@ -59,14 +59,14 @@ A Model Context Protocol (MCP) server for Claude Code that provides semantic sea
 - 🦙 **Ollama Support** - Local embeddings using Ollama with llama2 model
 - ⚡ **Async Job System** - Background processing with real-time progress tracking
 
-## Quick Start
+## 🚀 Quick Start
 
-### Prerequisites
+### 📋 Prerequisites
 - 🔧 **Docker** - https://www.docker.com/ (for MongoDB)
 - 🦙 **Ollama** - https://ollama.com/download (for embeddings)
 - 🧵 **Yarn** - Package manager
 
-### Installation
+### 💿 Installation
 
 1. **Clone the repository:**
    ```bash
@@ -108,9 +108,9 @@ A Model Context Protocol (MCP) server for Claude Code that provides semantic sea
    yarn run mcp
    ```
 
-## Usage
+## 📖 Usage
 
-### Web Interface
+### 🌐 Web Interface
 
 1. Open http://localhost:3000
 2. Create a new index by providing:
@@ -120,7 +120,7 @@ A Model Context Protocol (MCP) server for Claude Code that provides semantic sea
 3. Use the search interface to test queries
 4. Manage existing projects (view stats, delete)
 
-### Claude Code Integration
+### 🤖 Claude Code Integration
 
 The project includes a pre-configured MCP setup in the `dist/` folder. 
 
@@ -155,7 +155,7 @@ Add this to your Claude Code configuration:
 }
 ```
 
-### Available MCP Tools
+### 🛠️ Available MCP Tools
 
 - `search_code` - Search through indexed code using semantic similarity
 - `index_codebase` - Index a new project directory
@@ -164,11 +164,11 @@ Add this to your Claude Code configuration:
 - `delete_project` - Delete a project and its data
 - `get_project_stats` - Get detailed project statistics
 
-## Delta Indexing
+## 🔄 Delta Indexing
 
 The project supports intelligent delta indexing that only processes files that have changed since the last index update. This provides significant performance benefits for large codebases.
 
-### How Delta Indexing Works
+### ⚙️ How Delta Indexing Works
 
 1. **File Tracking** - Each indexed file stores metadata including:
    - File size, modification time, and content hash
@@ -185,7 +185,7 @@ The project supports intelligent delta indexing that only processes files that h
    - ➕ **Add** newly created files
    - 🗑️ **Remove** chunks for deleted files
 
-### Using Delta Indexing
+### 🎯 Using Delta Indexing
 
 **Web UI:** Click the orange "Update" button next to any project to run a delta update.
 
@@ -193,7 +193,7 @@ The project supports intelligent delta indexing that only processes files that h
 
 **API:** POST to `/api/projects/{projectId}/update` with directory path and exclude patterns.
 
-### Performance Benefits
+### 📊 Performance Benefits
 
 - **Large codebases**: Instead of re-indexing 1000+ files, typically only 1-10 files change
 - **Development workflow**: Quick updates during active development
@@ -206,11 +206,11 @@ Files processed: 4/851 files
 Time saved: ~95% compared to full re-index
 ```
 
-## Asynchronous Job System
+## ⚡ Asynchronous Job System
 
 All indexing operations now run asynchronously with real-time progress monitoring:
 
-### Features
+### ✨ Features
 
 - **Immediate Response**: APIs return immediately with a job ID
 - **Progress Monitoring**: Real-time status updates every 3-5 seconds
@@ -218,7 +218,7 @@ All indexing operations now run asynchronously with real-time progress monitorin
 - **Non-blocking**: Browser doesn't freeze during long indexing operations
 - **Detailed Logs**: Per-job logging and statistics
 
-### API Changes
+### 🔄 API Changes
 
 **Before (blocking):**
 ```javascript
@@ -232,14 +232,14 @@ GET /api/jobs/{jobId} -> poll for status and progress
 GET /api/jobs -> list all jobs
 ```
 
-### Job Statuses
+### 📊 Job Statuses
 
 - `pending` - Job created, waiting to start
 - `running` - Currently processing files with real-time progress tracking
 - `completed` - Successfully finished
 - `failed` - Error occurred during processing
 
-### Progress Tracking
+### 📈 Progress Tracking
 
 Jobs now show **data-driven progress percentages**:
 
@@ -254,7 +254,7 @@ Jobs now show **data-driven progress percentages**:
 - **File counters**: "45/192 files processed"
 - **Fallback to status-only** if progress unavailable
 
-### Web UI Improvements
+### 🎨 Web UI Improvements
 
 - **Real-time Progress**: See live updates as files are processed
 - **Job Dashboard**: Monitor active and recent jobs
@@ -264,9 +264,9 @@ Jobs now show **data-driven progress percentages**:
 - **Modal Forms**: Professional UI instead of browser alerts
 - **Project Memory**: Stores directory paths and settings for easy updates
 
-## Real-time Features
+## ⏱️ Real-time Features
 
-### Live Log Streaming
+### 📡 Live Log Streaming
 - **File-based Logging**: All logs written to `server.log` file
 - **Server-Sent Events**: Real-time streaming from actual log file
 - **Historical Logs**: Shows recent log entries on connection
@@ -274,26 +274,26 @@ Jobs now show **data-driven progress percentages**:
 - **Auto-reconnection**: Handles connection drops gracefully
 - **Persistent Storage**: Logs survive server restarts
 
-### Project Metadata Storage
+### 💾 Project Metadata Storage
 - **Path Memory**: Directory paths stored in database after first index
 - **Settings Persistence**: Exclude patterns remembered per project
 - **Smart Defaults**: Update forms pre-filled with previous settings
 - **Backward Compatible**: Works with existing projects
 
-### Enhanced Forms
+### 📝 Enhanced Forms
 - **Modal Interface**: Clean, professional forms instead of browser prompts
 - **Pre-filled Data**: Forms populate with existing project settings
 - **Validation**: Client-side validation before submission
 - **Contextual Help**: Helpful placeholders and tips
 
-## API Enhancements
+## 🔌 API Enhancements
 
-### New Endpoints
+### 🆕 New Endpoints
 - `GET /api/logs/stream` - Server-Sent Events for real-time logs
 - `GET /api/projects/{id}/metadata` - Get stored project settings
 - `GET /api/jobs/active` - Get only currently running jobs
 
-### Database Schema
+### 🗄️ Database Schema
 Projects now store metadata in `project_metadata` collection:
 ```json
 {
@@ -306,9 +306,9 @@ Projects now store metadata in `project_metadata` collection:
 }
 ```
 
-## Configuration
+## ⚙️ Configuration
 
-### Environment Variables
+### 🌍 Environment Variables
 
 ```env
 MONGODB_URI=mongodb://root:examplepassword@localhost:27017
@@ -317,7 +317,7 @@ OLLAMA_MODEL=llama2
 PORT=3000
 ```
 
-## Project Structure
+## 📁 Project Structure
 
 ```
 vector-mcp/
@@ -341,9 +341,9 @@ vector-mcp/
 └── docker-compose.yml       # MongoDB container setup
 ```
 
-## Docker Commands
+## 🐳 Docker Commands
 
-### Service Management
+### 🎛️ Service Management
 ```bash
 # Start all services
 docker-compose up -d
@@ -355,7 +355,7 @@ docker-compose down
 docker-compose logs -f
 ```
 
-### Service Health Checks
+### 🔍 Service Health Checks
 ```bash
 # Check service status
 docker-compose ps
@@ -365,7 +365,7 @@ curl http://localhost:3000/health      # Vector MCP
 curl http://localhost:11434/api/tags   # Ollama
 ```
 
-### Data Management
+### 💾 Data Management
 ```bash
 # Backup MongoDB data
 docker-compose exec mongodb mongodump --uri="mongodb://root:examplepassword@localhost:27017"
@@ -374,36 +374,6 @@ docker-compose exec mongodb mongodump --uri="mongodb://root:examplepassword@loca
 docker-compose down -v
 ```
 
-## Troubleshooting
-
-### Docker Issues
-**Services won't start:**
-```bash
-# Check Docker is running
-docker info
-```
-
-### Service-Specific Issues
-**MongoDB Connection:**
-- Ensure MongoDB container is healthy: `docker-compose ps`
-- Check connection from app container: `docker-compose exec vector-mcp curl -f mongodb:27017`
-
-**Performance:**
-- Large codebases may take time to index
-- Monitor container resources: `docker stats`
-- Consider adjusting chunk size in `FileIndexer.js`
-
-## Production Deployment
-
-### Docker Compose Production
-```bash
-# Use production compose file
-docker-compose -f docker-compose.yml up -d
-
-# Enable log rotation
-docker-compose exec vector-mcp logrotate /etc/logrotate.conf
-```
-
-## License
+## 📄 License
 
 MIT
