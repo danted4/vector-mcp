@@ -6,7 +6,7 @@ A Model Context Protocol (MCP) server for Claude Code that provides semantic sea
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Claude Code   │    │   Web Browser   │    │   File System  │
+│   Claude Code   │    │   Web Browser   │    │   File System   │
 │                 │    │                 │    │                 │
 │  - Context AI   │    │  - Project Mgmt │    │  - Source Code  │
 │  - Code Search  │    │  - Live Logs    │    │  - Delta Check  │
@@ -18,20 +18,20 @@ A Model Context Protocol (MCP) server for Claude Code that provides semantic sea
 ┌──────────────────────────────────────────────────────────────┐
 │                    Vector MCP Server                         │
 │                                                              │
-│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐          │
-│  │ MCP Handler │  │ Web Server  │  │ Job Manager │          │
-│  │             │  │             │  │             │          │
-│  │ - Tools     │  │ - REST API  │  │ - Async Ops │          │
-│  │ - Resources │  │ - Static UI │  │ - Progress  │          │
-│  └─────┬───────┘  └─────┬───────┘  └─────┬───────┘          │
-│        │                │                │                  │
-│        └────────────────┼────────────────┘                  │
-│                         │                                   │
+│  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐           │
+│  │ MCP Handler │  │ Web Server  │  │ Job Manager │           │
+│  │             │  │             │  │             │           │
+│  │ - Tools     │  │ - REST API  │  │ - Async Ops │           │
+│  │ - Resources │  │ - Static UI │  │ - Progress  │           │
+│  └─────┬───────┘  └─────┬───────┘  └─────┬───────┘           │
+│        │                │                │                   │
+│        └────────────────┼────────────────┘                   │
+│                         │                                    │
 │  ┌─────────────────────────────────────────────────────────┐ │
 │  │              File Indexer                               │ │
 │  │                                                         │ │
-│  │  - Code Chunking    - File Hashing    - Delta Logic    │ │
-│  │  - Content Filter   - Pattern Match   - Change Track   │ │
+│  │  - Code Chunking    - File Hashing    - Delta Logic     │ │
+│  │  - Content Filter   - Pattern Match   - Change Track    │ │
 │  └─────────────────────┬───────────────────────────────────┘ │
 │                        │                                     │
 └────────────────────────┼─────────────────────────────────────┘
