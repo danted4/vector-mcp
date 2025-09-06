@@ -122,7 +122,21 @@ A Model Context Protocol (MCP) server for Claude Code that provides semantic sea
 
 ### Claude Code Integration
 
-Add this MCP server to your Claude Code configuration:
+The project includes a pre-configured MCP setup in the `dist/` folder. 
+
+**Option 1: Use the provided configuration (Recommended)**
+1. Copy `dist/.mcp.json` to your Claude Code config directory
+2. Edit `dist/mcp.sh` to update the absolute path:
+   ```bash
+   #!/bin/bash
+   # Update this path to your actual project location
+   cd /path/to/your/vector-mcp
+   node mcp-server.js
+   ```
+3. Make the script executable: `chmod +x dist/mcp.sh`
+
+**Option 2: Manual configuration**
+Add this to your Claude Code configuration:
 
 ```json
 {
